@@ -1,116 +1,113 @@
-import React from "react";
-import Helmet from "react-helmet";
-import styled from "styled-components";
-import Input from "../../Components/Input";
-import Button from "../../Components/Button";
+import React, { useState } from "react";
+import AuthPresenter from "./AuthPresenter";
+import useInput from "../../Hooks/useInput";
+import { useMutation } from "react-apollo-hooks";
+import {
+  LOG_IN,
+  CREATE_ACCOUNT,
+  CONFIRM_SECRET,
+  LOCAL_LOG_IN
+} from "./AuthQueries";
+import { toast } from "react-toastify";
 
-const Wrapper = styled.div`
-  min-height: 80vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-`;
+export default () => {
+  const [action, setAction] = useState("logIn");
+  const username = useInput("");
+  const firstName = useInput("");
+  const lastName = useInput("");
+  const secret = useInput("");
+  const email = useInput("");
+  const [requestSecretMutation] = useMutation(LOG_IN, {
+    variables: { email: email.value }
+  });
+  const [createAccountMutation] = useMutation(CREATE_ACCOUNT, {
+    variables: {
+      email: email.value,
+      username: username.value,
+      firstName: firstName.value,
+      lastName: lastName.value
+    }
+  });
+  const [confirmSecretMutation] = useMutation(CONFIRM_SECRET, {
+    variables: {
+      email: email.value,
+      secret: secret.value
+    }
+  });
+  const [localLogInMutation] = useMutation(LOCAL_LOG_IN);
 
-const Box = styled.div`
-  ${props => props.theme.whiteBox}
-  border-radius:0px;
-  width: 100%;
-  max-width: 350px;
-`;
-
-const StateChanger = styled(Box)`
-  text-align: center;
-  padding: 20px 0px;
-`;
-
-const Link = styled.span`
-  color: ${props => props.theme.blueColor};
-  cursor: pointer;
-`;
-
-const Form = styled(Box)`
-  padding: 40px;
-  padding-bottom: 30px;
-  margin-bottom: 15px;
-  form {
-    width: 100%;
-    input {
-      width: 100%;
-      &:not(:last-child) {
-        margin-bottom: 7px;
+  const onSubmit = async e => {
+    e.preventDefault();
+    if (action === "logIn") {
+      if (email.value !== "") {
+        try {
+          const {
+            data: { requestSecret }
+          } = await requestSecretMutation();
+          if (!requestSecret) {
+            toast.error("You dont have an account yet, create one");
+            setTimeout(() => setAction("signUp"), 3000);
+          } else {
+            toast.success("Check your inbox for your login secret");
+            setAction("confirm");
+          }
+        } catch {
+          toast.error("Can't request secret, try again");
+        }
+      } else {
+        toast.error("Email is required");
+      }
+    } else if (action === "signUp") {
+      if (
+        email.value !== "" &&
+        username.value !== "" &&
+        firstName.value !== "" &&
+        lastName.value !== ""
+      ) {
+        try {
+          const {
+            data: { createAccount }
+          } = await createAccountMutation();
+          if (!createAccount) {
+            toast.error("Can't create account");
+          } else {
+            toast.success("Account created! Log In now");
+            setTimeout(() => setAction("logIn"), 3000);
+          }
+        } catch (e) {
+          toast.error(e.message);
+        }
+      } else {
+        toast.error("All field are required");
+      }
+    } else if (action === "confirm") {
+      if (secret.value !== "") {
+        try {
+          const {
+            data: { confirmSecret: token }
+          } = await confirmSecretMutation();
+          if (token !== "" && token !== undefined) {
+            localLogInMutation({ variables: { token } });
+          } else {
+            throw Error();
+          }
+        } catch {
+          toast.error("Cant confirm secret,check again");
+        }
       }
     }
-    button {
-      margin-top: 10px;
-    }
-  }
-`;
+  };
 
-export default ({
-  action,
-  username,
-  firstName,
-  lastName,
-  email,
-  setAction,
-  onSubmit,
-  secret
-}) => (
-  <Wrapper>
-    <Form>
-      {action === "logIn" && (
-        <>
-          <Helmet>
-            <title>Log In | Prismagram</title>
-          </Helmet>
-          <form onSubmit={onSubmit}>
-            <Input placeholder={"Email"} {...email} type="email" />
-            <Button text={"Log in"} />
-          </form>
-        </>
-      )}
-      {action === "signUp" && (
-        <>
-          <Helmet>
-            <title>Sign Up | Prismagram</title>
-          </Helmet>
-          <form onSubmit={onSubmit}>
-            <Input placeholder={"First name"} {...firstName} />
-            <Input placeholder={"Last name"} {...lastName} />
-            <Input placeholder={"Email"} {...email} type="email" />
-            <Input placeholder={"Username"} {...username} />
-            <Button text={"Sign up"} />
-          </form>
-        </>
-      )}
-      {action === "confirm" && (
-        <>
-          <Helmet>
-            <title>Confirm Secret | Prismagram</title>
-          </Helmet>
-          <form onSubmit={onSubmit}>
-            <Input placeholder="Paste your secret" required {...secret} />
-            <Button text={"Confirm"} />
-          </form>
-        </>
-      )}
-    </Form>
-
-    {action !== "confirm" && (
-      <StateChanger>
-        {action === "logIn" ? (
-          <>
-            Don't have an account?{" "}
-            <Link onClick={() => setAction("signUp")}>Sign up</Link>
-          </>
-        ) : (
-          <>
-            Have an account?{" "}
-            <Link onClick={() => setAction("logIn")}>Log in</Link>
-          </>
-        )}
-      </StateChanger>
-    )}
-  </Wrapper>
-);
+  return (
+    <AuthPresenter
+      setAction={setAction}
+      action={action}
+      username={username}
+      firstName={firstName}
+      lastName={lastName}
+      email={email}
+      secret={secret}
+      onSubmit={onSubmit}
+    />
+  );
+};
