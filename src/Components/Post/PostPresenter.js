@@ -1,6 +1,8 @@
 import React from "react";
 import styled from "styled-components";
 import TextareaAutosize from "react-autosize-textarea";
+import Moment from "react-moment";
+import "moment-timezone";
 import FatText from "../FatText";
 import Avatar from "../Avatar";
 import { HeartFull, HeartEmpty, Comment as CommentIcon } from "../Icons";
@@ -154,7 +156,9 @@ export default ({
           ))}
         </Comments>
       )}
-      <Timestamp>{createdAt}</Timestamp>
+      <Timestamp>
+        <Moment format="YYYY/MM/DD HH:mm">{createdAt}</Moment>
+      </Timestamp>
       <Textarea
         placeholder={"Add a comment..."}
         value={newComment.value}
